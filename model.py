@@ -6,7 +6,9 @@ from selenium.webdriver.support import expected_conditions as EC
 import time
 import os
 import csv
-
+import gpxpy
+from datetime import datetime
+from xml.etree import ElementTree
 
 class AirQualityExtractor:
     def __init__(self):
@@ -37,7 +39,7 @@ class AirQualityExtractor:
         return data
 
     def write_to_csv(self, data):
-        csv_file_path = 'output.csv'
+        csv_file_path = 'air_quality.csv'
         csv_header = ["DateObserved", "HourObserved", "LocalTimeZone", "ReportingArea", "StateCode",
                       "Latitude", "Longitude", "ParameterName", "AQI", "CategoryNumber", "CategoryName"]
         file_exists = os.path.isfile(csv_file_path)
@@ -105,12 +107,47 @@ class AirQualityExtractor:
         self.write_to_csv(output_data)
 
 
-if __name__ == '__main__':
-    extractor = AirQualityExtractor()
-    print("*"*10 + " Extracting Data " + "*"*10)
-    extractor.create_driver()
-    extractor.scrape_data(
-        latitude=34.0522, longitude=-118.2437, distance=25, date='2021-10-01'
-    )
-    extractor.close_driver()
-    print("*"*10 + " Data Extracted " + "*"*10)
+class GPX_Extractor:
+    def __init__(self):
+        self.gpx_file_path = './TaskData/danielle GPX .GPX'
+
+    def read_gpx_file(self):
+        tree = ElementTree.parse(self.gpx_file_path)
+        root = tree.getroot()
+
+        data = []
+        for trkpt in root.iter('{http://www.topografix.com/GPX/1/1}trkpt'):
+            lat = trkpt.attrib['lat']
+            lon = trkpt.attrib['lon']
+            ele = trkpt.find('{http://www.topografix.com/GPX/1/1}ele').text
+            time_str = trkpt.find(
+                '{http://www.topografix.com/GPX/1/1}time').text
+            time_obj = datetime.strptime(time_str, "%m/%d/%Y, %I:%M:%S %p")
+
+            data.append({
+                'lat': lat,
+                'lon': lon,
+                'ele': ele,
+                'time': time_obj
+            })
+
+        return data
+
+    def write_to_csv(self, data):
+        csv_file_path = 'gpx_data.csv'
+        csv_header = ["lat", "lon", "ele", "time"]
+        file_exists = os.path.isfile(csv_file_path)
+        with open(csv_file_path, 'a', newline='') as csv_file:
+            writer = csv.DictWriter(csv_file, fieldnames=csv_header)
+            if not file_exists:
+                writer.writeheader()
+            writer.writerows(data)
+
+    def extract_data(self):
+        data = self.read_gpx_file()
+        self.write_to_csv(data)
+
+
+if __name__ == "__main__":
+    gpx_extractor = GPX_Extractor()
+    gpx_extractor.extract_data()
