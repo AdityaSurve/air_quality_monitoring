@@ -1,3 +1,4 @@
+from datetime import datetime, timedelta
 from selenium import webdriver
 from selenium.webdriver.common.by import By
 from selenium.webdriver.edge.service import Service
@@ -208,7 +209,9 @@ class GPX_Extractor:
 
 class Ping_Extractor():
     def __init__(self):
-        self.ping_Base_file_path = './TaskData/SurveyData/SurveyData/'
+        self.ping_base_file_path = './TaskData/SurveyData/'
+        self.output_file_path = './results/'
+
     
     def read_csv(self, file_path):
         df = pd.read_csv(file_path)
@@ -239,30 +242,70 @@ class Ping_Extractor():
 
         return lon_min_deg, lat_min_deg, lon_max_deg, lat_max_deg
     
-    def append_bbox(self, path, data):
+    def append_bbox(self, output_dir, data):
         for row in data:
-            if 'LONGITUDE' in row and 'LATITUDE' in row:
+            if 'LONGITUDE' in row and 'LATITUDE' in row and row['LONGITUDE'] != 0 and row['LATITUDE'] != 0:
                 bbox = self.bounding_box_calculator(
                     row['LONGITUDE'], row['LATITUDE'], 100)
                 bbox = [bbox[0], bbox[1], bbox[2], bbox[3]]
                 row['bbox'] = bbox
                 
         df = pd.DataFrame(data)
-        df.to_csv(path, index=False)    
-
-    # def update_air_quality_data(self, data):
+        output_path = os.path.join(self.output_file_path, output_dir)
+        df.to_csv(output_path, index=False)
 
     def extract_data(self):
-        file_list = os.listdir(self.ping_Base_file_path)
-        for file in file_list:
-            file_path = os.path.join(self.ping_Base_file_path, file)
+        file_list = os.listdir(self.ping_base_file_path)
+        for f in file_list:
+            file_path = os.path.join(self.ping_base_file_path, f)
             if os.path.isfile(file_path):
                 data = self.read_csv(file_path)
-                self.append_bbox(file_path, data['data'])
+                self.append_bbox(f, data['data'])
 
+    def isCoordinateInBBox(self, latitude, longitude, bbox):
+        latitude = float(latitude)
+        longitude = float(longitude)
 
-        
+        lat_min = bbox[1]
+        lat_max = bbox[3]
+        lon_min = bbox[0]
+        lon_max = bbox[2]
 
+        return latitude >= lat_min and latitude <= lat_max and longitude >= lon_min and longitude <= lon_max
+
+    def update_air_quality_data(self):
+        air_quality_data = pd.read_csv('./results/air_quality.csv')
+        air_quality_data['UTC'] = pd.to_datetime(air_quality_data['UTC'])
+        ping_files = [f for f in os.listdir(
+            './results') if f not in ['air_quality.csv', 'gpx_data.csv']]
+
+        for file in ping_files:
+            ping_data = pd.read_csv(f'./results/{file}')
+            ping_data['actual_start_local'] = pd.to_datetime(
+                ping_data['actual_start_local'], format='%d-%m-%Y %H:%M:%S')
+            # Swap lat and lon
+            ping_data['LATITUDE'], ping_data['LONGITUDE'] = ping_data['LONGITUDE'], ping_data['LATITUDE']
+
+            for index, row in ping_data.iterrows():
+                bbox = self.bounding_box_calculator(
+                    row['LATITUDE'], row['LONGITUDE'], self.distance)
+                time_start = row['actual_start_local'] - timedelta(hours=1)
+                time_end = row['actual_start_local']
+
+                filtered_data = air_quality_data[
+                    (air_quality_data['Latitude'] >= bbox[0]) &
+                    (air_quality_data['Latitude'] <= bbox[1]) &
+                    (air_quality_data['Longitude'] >= bbox[2]) &
+                    (air_quality_data['Longitude'] <= bbox[3]) &
+                    (air_quality_data['UTC'] >= time_start) &
+                    (air_quality_data['UTC'] <= time_end)
+                ]
+
+                avg_aqi = filtered_data.groupby('Parameter')['AQI'].mean()
+                for param, aqi in avg_aqi.iteritems():
+                    ping_data.loc[index, param] = aqi
+
+            ping_data.to_csv(f'./results/updated_{file}', index=False)
 
 if __name__ == "__main__":
     # gpx_extractor = GPX_Extractor()
@@ -270,3 +313,6 @@ if __name__ == "__main__":
     # air = AirQualityExtractor()
     # air.gpx_processor(10)
 
+    ping = Ping_Extractor()
+    # ping.extract_data()
+    ping.update_air_quality_data()
