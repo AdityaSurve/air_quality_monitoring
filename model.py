@@ -74,7 +74,12 @@ class AirQualityExtractor:
         print(f'Date: {date}')
         print(f'Hour: {hour}')
         print(f'Bounding Box: {bounding_box}')
-        url = f'https://www.airnowapi.org/aq/data/?startDate={date}T{hour}&endDate={date}T{hour}&parameters=PM25,PM10&BBOX={bounding_box[0]},{bounding_box[1]},{bounding_box[2]},{bounding_box[3]}&dataType=A&format=application/json&verbose=0&monitorType=0&includerawconcentrations=0&API_KEY=2227FB9E-63AE-497B-A911-03E91430AEA1'
+        # url = f'https://www.airnowapi.org/aq/data/?startDate={date}T{hour}&endDate={date}T{hour}&parameters=PM25,PM10&BBOX={bounding_box[0]},{bounding_box[1]},{bounding_box[2]},{bounding_box[3]}&dataType=A&format=application/json&verbose=0&monitorType=0&includerawconcentrations=0&API_KEY=2227FB9E-63AE-497B-A911-03E91430AEA1'
+
+        # start_date is 08/04/2024
+        # end_date is 19/04/2024
+        url = f'https://www.airnowapi.org/aq/data/?startDate=08/04/2024T00&endDate=19/04/2024T23&parameters=PM25,PM10&BBOX={bounding_box[0]},{bounding_box[1]},{bounding_box[2]},{bounding_box[3]}&dataType=A&format=application/json&verbose=0&monitorType=0&includerawconcentrations=0&API_KEY=2227FB9E-63AE-497B-A911-03E91430AEA1'
+
 
         print("Url: ", url)
         response = requests.get(url)
@@ -95,7 +100,14 @@ class AirQualityExtractor:
             self.api_data(date, bounding_box)
             print(f'Iteration {index} completed.')
 
-    def scrape_data(self, latitude, longitude, distance, date):
+    def scrape_data(self, bounding_box, date):
+        hour_holder = date.split(' ')[1]
+        hour = hour_holder.split(':')[0]
+        date = date.split(' ')[0]
+        bounding_box = bounding_box.replace('[', '')
+        bounding_box = bounding_box.replace(']', '')
+        bounding_box = bounding_box.split(',')
+        bounding_box = [float(x) for x in bounding_box]
         self.create_driver()
         self.navigate_to_url('https://docs.airnowapi.org/login')
         self.sleep()
@@ -109,25 +121,74 @@ class AirQualityExtractor:
         login_button.click()
         self.sleep()
         self.navigate_to_url(
-            'https://docs.airnowapi.org/HistoricalObservationsByLatLon/query')
+            'https://docs.airnowapi.org/Data/query')
 
-        input1 = WebDriverWait(self.driver, 10).until(
-            EC.presence_of_element_located((By.ID, 'latitudeCoord'))
+        start_date = WebDriverWait(self.driver, 10).until(
+            EC.presence_of_element_located(
+                (By.ID, 'beginDateSelectorWpr_dateSelector'))
         )
-        input2 = self.driver.find_element(By.ID, 'longitudeCoord')
-        input3 = self.driver.find_element(By.NAME, 'distance')
-        input4 = self.driver.find_element(
-            By.ID, 'dateSelectorWpr_dateSelector')
-        button = self.driver.find_element(By.ID, 'buildUrl')
-        input1.clear()
-        input1.send_keys(latitude)
-        input2.clear()
-        input2.send_keys(longitude)
-        input3.clear()
-        input3.send_keys(distance)
-        input4.clear()
-        input4.send_keys(date)
+        start_hour = self.driver.find_element(
+            By.ID, 'beginDateSelectorWpr_hourSelector')
+        end_date = self.driver.find_element(
+            By.ID, 'endDateSelectorWpr_dateSelector')
+        end_hour = self.driver.find_element(
+            By.ID, 'endDateSelectorWpr_hourSelector')
+        bBoxMaxY = self.driver.find_element(
+            By.ID, 'bboxMaxY')
+        bBoxMaxX = self.driver.find_element(
+            By.ID, 'bboxMaxX')
+        bBoxMinY = self.driver.find_element(
+            By.ID, 'bboxMinY')
+        bBoxMinX = self.driver.find_element(
+            By.ID, 'bBoxMinX')
+        ozone = self.driver.find_element(
+            By.ID, 'ozoneSel')
+        pm25 = self.driver.find_element(
+            By.ID, 'pm25Sel')
+        pm10 = self.driver.find_element(
+            By.ID, 'pm10Sel')
+        co = self.driver.find_element(
+            By.ID, 'coSel')
+        no2 = self.driver.find_element(
+            By.ID, 'no2Sel')
+        so2 = self.driver.find_element(
+            By.ID, 'so2Sel')
+        formatSelect = self.driver.find_element(
+            By.ID, 'formatSelect')
+
+        button = self.driver.find_element(
+            By.ID, 'buildUrl')
+
+        start_date.send_keys(date)
+        start_hour.send_keys(hour)
+
+        end_date.send_keys(date)
+        end_hour.send_keys(hour)
+
+        bBoxMaxY.send_keys(bounding_box[3])
+        bBoxMaxX.send_keys(bounding_box[2])
+        bBoxMinY.send_keys(bounding_box[1])
+        bBoxMinX.send_keys(bounding_box[0])
+
+        if not pm10.is_selected():
+            pm10.click()
+        if not pm25.is_selected():
+            pm25.click()
+        if ozone.is_selected():
+            ozone.click()
+        if no2.is_selected():
+            no2.click()
+        if so2.is_selected():
+            so2.click()
+        if co.is_selected():
+            co.click()
+
+        formatSelect.click()
+        formatSelect.send_keys('application/json')
+
         button.click()
+        self.sleep()
+
         output = WebDriverWait(self.driver, 10).until(
             EC.presence_of_element_located((By.ID, 'urlView'))
         )
@@ -309,11 +370,10 @@ class Ping_Extractor():
             ping_data.to_csv(f'./results/Updated_{file}', index=False)
 
 if __name__ == "__main__":
-    # gpx_extractor = GPX_Extractor()
-    # gpx_extractor.extract_data()
-    # air = AirQualityExtractor()
-    # air.gpx_processor(10)
-
+    gpx_extractor = GPX_Extractor()
+    gpx_extractor.extract_data()
+    air = AirQualityExtractor()
+    air.gpx_processor(10)
     ping = Ping_Extractor()
     ping.extract_data()
     ping.update_air_quality_data(5)
