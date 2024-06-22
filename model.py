@@ -9,12 +9,16 @@ import csv
 import gpxpy
 from datetime import datetime
 from xml.etree import ElementTree
+import requests
+import math
+import pandas as pd
 
 class AirQualityExtractor:
     def __init__(self):
         self.driver = None
         self.service = None
         self.wait_time = 5
+        self.base_url = 'https://www.airnowapi.org/aq/observation/latLong/historical'
 
     def create_driver(self):
         self.service = Service(r'C://Users/Aditya/Downloads/msedgedriver.exe')
@@ -39,17 +43,58 @@ class AirQualityExtractor:
         return data
 
     def write_to_csv(self, data):
-        csv_file_path = 'air_quality.csv'
-        csv_header = ["DateObserved", "HourObserved", "LocalTimeZone", "ReportingArea", "StateCode",
-                      "Latitude", "Longitude", "ParameterName", "AQI", "CategoryNumber", "CategoryName"]
-        file_exists = os.path.isfile(csv_file_path)
-        with open(csv_file_path, 'a', newline='') as csv_file:
-            writer = csv.DictWriter(csv_file, fieldnames=csv_header)
-            if not file_exists:
-                writer.writeheader()
-            writer.writerows(data)
+        csv_file_path = './results/air_quality.csv'
+        csv_header = ["Latitude",
+                      "Longitude",
+                      "UTC",
+                      "Parameter",
+                      "Unit",
+                      "AQI",
+                      "Category"]
+        try:
+            file_exists = os.path.isfile(csv_file_path)
+            with open(csv_file_path, 'a', newline='') as csv_file:
+                writer = csv.DictWriter(csv_file, fieldnames=csv_header)
+                if not file_exists:
+                    writer.writeheader()
+                writer.writerows(data)
+                print("Data written to CSV successfully.")
+        except Exception as e:
+            print("Error writing to CSV:", e)
+
+    def api_data(self, date, bounding_box):
+        hour_holder = date.split(' ')[1]
+        hour = hour_holder.split(':')[0]
+        date = date.split(' ')[0]
+        bounding_box = bounding_box.replace('[', '')
+        bounding_box = bounding_box.replace(']', '')
+        bounding_box = bounding_box.split(',')
+        bounding_box = [float(x) for x in bounding_box]
+        print(f'Date: {date}')
+        print(f'Hour: {hour}')
+        print(f'Bounding Box: {bounding_box}')
+        url = f'https://www.airnowapi.org/aq/data/?startDate={date}T{hour}&endDate={date}T{hour}&parameters=PM25,PM10&BBOX={bounding_box[0]},{bounding_box[1]},{bounding_box[2]},{bounding_box[3]}&dataType=A&format=application/json&verbose=0&monitorType=0&includerawconcentrations=0&API_KEY=2227FB9E-63AE-497B-A911-03E91430AEA1'
+        print("Url: ", url)
+        response = requests.get(url)
+        if response.status_code == 200:
+            data = response.json()
+            self.write_to_csv(data)
+        else:
+            print("Failed to get data from API")
+
+    def gpx_processor(self, distance):
+        csv_file_path = './results/gpx_data.csv'
+        data = pd.read_csv(csv_file_path)
+        data = data.head(400)
+        for index, row in data.iterrows():
+            distance = distance
+            date = row['time']
+            bounding_box = row['bbox']
+            self.api_data(date, bounding_box)
+            print(f'Iteration {index} completed.')
 
     def scrape_data(self, latitude, longitude, distance, date):
+        self.create_driver()
         self.navigate_to_url('https://docs.airnowapi.org/login')
         self.sleep()
         username_field = WebDriverWait(self.driver, 10).until(
@@ -57,13 +102,10 @@ class AirQualityExtractor:
         )
         password_field = self.driver.find_element(By.ID, 'password')
         login_button = self.driver.find_element(By.NAME, 'exec')
-
         username_field.send_keys('aditya_25')
         password_field.send_keys('aditya_25@AirNow')
         login_button.click()
-
         self.sleep()
-
         self.navigate_to_url(
             'https://docs.airnowapi.org/HistoricalObservationsByLatLon/query')
 
@@ -75,7 +117,6 @@ class AirQualityExtractor:
         input4 = self.driver.find_element(
             By.ID, 'dateSelectorWpr_dateSelector')
         button = self.driver.find_element(By.ID, 'buildUrl')
-
         input1.clear()
         input1.send_keys(latitude)
         input2.clear()
@@ -84,32 +125,47 @@ class AirQualityExtractor:
         input3.send_keys(distance)
         input4.clear()
         input4.send_keys(date)
-
         button.click()
-
         output = WebDriverWait(self.driver, 10).until(
             EC.presence_of_element_located((By.ID, 'urlView'))
         )
-
         self.sleep()
-
         main_button = self.driver.find_element(By.ID, 'runItBtn')
         main_button.click()
-
         final_output = WebDriverWait(self.driver, 10).until(
             EC.presence_of_element_located((By.ID, 'outputView'))
         )
-
         self.sleep()
-
         final_output_text = final_output.text
         output_data = self.parse_output_text(final_output_text)
         self.write_to_csv(output_data)
-
+        self.close_driver()
 
 class GPX_Extractor:
     def __init__(self):
         self.gpx_file_path = './TaskData/danielle GPX .GPX'
+
+    def bounding_box_calculator(self, latitude, longitude, distance):
+        latitude = float(latitude)
+        longitude = float(longitude)
+        distance = float(distance)
+        radius = 3958.8
+        lat_rad = latitude * (math.pi / 180)
+        lon_rad = longitude * (math.pi / 180)
+        d_rad = distance / (2 * radius)
+
+        lat_min = lat_rad - d_rad
+        lat_max = lat_rad + d_rad
+        lon_min = lon_rad - d_rad
+        lon_max = lon_rad + d_rad
+
+        lat_min_deg = lat_min * (180 / math.pi)
+        lat_max_deg = lat_max * (180 / math.pi)
+
+        lon_min_deg = lon_min * (180 / math.pi)
+        lon_max_deg = lon_max * (180 / math.pi)
+
+        return lon_min_deg, lat_min_deg, lon_max_deg, lat_max_deg
 
     def read_gpx_file(self):
         tree = ElementTree.parse(self.gpx_file_path)
@@ -123,19 +179,22 @@ class GPX_Extractor:
             time_str = trkpt.find(
                 '{http://www.topografix.com/GPX/1/1}time').text
             time_obj = datetime.strptime(time_str, "%m/%d/%Y, %I:%M:%S %p")
+            bbox = self.bounding_box_calculator(lat, lon, 100)
+            bbox = [bbox[0], bbox[1], bbox[2], bbox[3]]
 
             data.append({
                 'lat': lat,
                 'lon': lon,
                 'ele': ele,
-                'time': time_obj
+                'time': time_obj,
+                'bbox': bbox
             })
 
         return data
 
     def write_to_csv(self, data):
-        csv_file_path = 'gpx_data.csv'
-        csv_header = ["lat", "lon", "ele", "time"]
+        csv_file_path = './results/gpx_data.csv'
+        csv_header = ["lat", "lon", "ele", "time", "bbox"]
         file_exists = os.path.isfile(csv_file_path)
         with open(csv_file_path, 'a', newline='') as csv_file:
             writer = csv.DictWriter(csv_file, fieldnames=csv_header)
@@ -147,7 +206,67 @@ class GPX_Extractor:
         data = self.read_gpx_file()
         self.write_to_csv(data)
 
+class Ping_Extractor():
+    def __init__(self):
+        self.ping_Base_file_path = './TaskData/SurveyData/SurveyData/'
+    
+    def read_csv(self, file_path):
+        df = pd.read_csv(file_path)
+        return {
+            'path': file_path,
+            'data': df.to_dict(orient='records')
+        }
+    
+    def bounding_box_calculator(self, latitude, longitude, distance):
+        latitude = float(latitude)
+        longitude = float(longitude)
+        distance = float(distance)
+        radius = 3958.8
+        lat_rad = latitude * (math.pi / 180)
+        lon_rad = longitude * (math.pi / 180)
+        d_rad = distance / (2 * radius)
+
+        lat_min = lat_rad - d_rad
+        lat_max = lat_rad + d_rad
+        lon_min = lon_rad - d_rad
+        lon_max = lon_rad + d_rad
+
+        lat_min_deg = lat_min * (180 / math.pi)
+        lat_max_deg = lat_max * (180 / math.pi)
+
+        lon_min_deg = lon_min * (180 / math.pi)
+        lon_max_deg = lon_max * (180 / math.pi)
+
+        return lon_min_deg, lat_min_deg, lon_max_deg, lat_max_deg
+    
+    def append_bbox(self, path, data):
+        for row in data:
+            if 'LONGITUDE' in row and 'LATITUDE' in row:
+                bbox = self.bounding_box_calculator(
+                    row['LONGITUDE'], row['LATITUDE'], 100)
+                bbox = [bbox[0], bbox[1], bbox[2], bbox[3]]
+                row['bbox'] = bbox
+                
+        df = pd.DataFrame(data)
+        df.to_csv(path, index=False)    
+
+    # def update_air_quality_data(self, data):
+
+    def extract_data(self):
+        file_list = os.listdir(self.ping_Base_file_path)
+        for file in file_list:
+            file_path = os.path.join(self.ping_Base_file_path, file)
+            if os.path.isfile(file_path):
+                data = self.read_csv(file_path)
+                self.append_bbox(file_path, data['data'])
+
+
+        
+
 
 if __name__ == "__main__":
-    gpx_extractor = GPX_Extractor()
-    gpx_extractor.extract_data()
+    # gpx_extractor = GPX_Extractor()
+    # gpx_extractor.extract_data()
+    # air = AirQualityExtractor()
+    # air.gpx_processor(10)
+
