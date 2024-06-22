@@ -75,6 +75,7 @@ class AirQualityExtractor:
         print(f'Hour: {hour}')
         print(f'Bounding Box: {bounding_box}')
         url = f'https://www.airnowapi.org/aq/data/?startDate={date}T{hour}&endDate={date}T{hour}&parameters=PM25,PM10&BBOX={bounding_box[0]},{bounding_box[1]},{bounding_box[2]},{bounding_box[3]}&dataType=A&format=application/json&verbose=0&monitorType=0&includerawconcentrations=0&API_KEY=2227FB9E-63AE-497B-A911-03E91430AEA1'
+
         print("Url: ", url)
         response = requests.get(url)
         if response.status_code == 200:
@@ -273,7 +274,7 @@ class Ping_Extractor():
 
         return latitude >= lat_min and latitude <= lat_max and longitude >= lon_min and longitude <= lon_max
 
-    def update_air_quality_data(self):
+    def update_air_quality_data(self, distance):
         air_quality_data = pd.read_csv('./results/air_quality.csv')
         air_quality_data['UTC'] = pd.to_datetime(air_quality_data['UTC'])
         ping_files = [f for f in os.listdir(
@@ -282,13 +283,13 @@ class Ping_Extractor():
         for file in ping_files:
             ping_data = pd.read_csv(f'./results/{file}')
             ping_data['actual_start_local'] = pd.to_datetime(
-                ping_data['actual_start_local'], format='%d-%m-%Y %H:%M:%S')
+                ping_data['actual_start_local'], format='%Y-%m-%d %H:%M:%S')
             # Swap lat and lon
             ping_data['LATITUDE'], ping_data['LONGITUDE'] = ping_data['LONGITUDE'], ping_data['LATITUDE']
 
             for index, row in ping_data.iterrows():
                 bbox = self.bounding_box_calculator(
-                    row['LATITUDE'], row['LONGITUDE'], self.distance)
+                    row['LATITUDE'], row['LONGITUDE'], distance)
                 time_start = row['actual_start_local'] - timedelta(hours=1)
                 time_end = row['actual_start_local']
 
@@ -300,12 +301,12 @@ class Ping_Extractor():
                     (air_quality_data['UTC'] >= time_start) &
                     (air_quality_data['UTC'] <= time_end)
                 ]
-
                 avg_aqi = filtered_data.groupby('Parameter')['AQI'].mean()
-                for param, aqi in avg_aqi.iteritems():
+                print(avg_aqi)
+                for param, aqi in avg_aqi.items():
                     ping_data.loc[index, param] = aqi
 
-            ping_data.to_csv(f'./results/updated_{file}', index=False)
+            ping_data.to_csv(f'./results/Updated_{file}', index=False)
 
 if __name__ == "__main__":
     # gpx_extractor = GPX_Extractor()
@@ -314,5 +315,5 @@ if __name__ == "__main__":
     # air.gpx_processor(10)
 
     ping = Ping_Extractor()
-    # ping.extract_data()
-    ping.update_air_quality_data()
+    ping.extract_data()
+    ping.update_air_quality_data(5)
