@@ -11,12 +11,9 @@ class PollutionChart extends React.Component {
     const PM10 = data.PM10 ? data.PM10.map((entry) => entry.AQI) : [];
     const labels = data.O3 ? data.O3.map((entry) => entry.Timestamp) : [];
 
-    this.originalData = {
-      O3: this.props.data.O3,
-      PM25: this.props.data["PM2.5"],
-      PM10: this.props.data.PM10,
-    };
+    this.originalData = [data.O3, data["PM2.5"], data.PM10];
 
+    console.log(this.originalData);
     this.state = {
       series: [
         { name: "O3", data: O3 },
@@ -50,8 +47,53 @@ class PollutionChart extends React.Component {
             colors: ["#000"],
           },
           y: {
-            formatter: function (val) {
-              return val;
+            formatter: function (val, opts) {
+              const index = opts.dataPointIndex;
+              const seriesIndex = opts.seriesIndex;
+              const originalData = this.originalData[seriesIndex][index];
+              const lat = originalData.Latitude;
+              const lon = originalData.Longitude;
+              const area = originalData.ReportingArea;
+              const cat = originalData.CategoryNumber;
+              const cat_name = originalData.CategoryName;
+              const colors = [
+                "#44DDA0",
+                "#FFD700",
+                "#FFA500",
+                "#FF6347",
+                "#8B0000",
+                "#800080",
+              ];
+
+              return `<div class="">
+                <div class="font-semibold text-xl" style="color: ${
+                  colors[cat - 1]
+                }">${val}</div>
+                <div class="grid grid-cols-2 gap-2 mt-3">
+                <div className="flex flex-col">
+                <div class="text-xs w-full">Latitude</div>
+                <div class="text-sm text-gray-300">${lat}</div>
+                </div>
+                <div className="flex flex-col">
+                <div class="text-xs w-full">Longitude</div>
+                <div class="text-sm text-gray-300">${lon}</div>
+                </div>
+                <div className="flex flex-col">
+                <div class="text-xs w-full">Area</div>
+                <div class="text-sm text-gray-300 w-20 truncate">${area}</div>
+                </div>
+                <div className="flex flex-col">
+                <div class="text-xs w-full">Category</div>
+                <div class="text-sm text-gray-300">${cat_name}</div>
+                </div>
+                </div>
+              </div>`;
+            }.bind(this),
+            title: {
+              formatter: function (seriesName) {
+                // return html
+                return `<div class="font-semibold">${seriesName}</div>`;
+              },
             },
           },
         },

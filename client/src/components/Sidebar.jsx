@@ -25,18 +25,17 @@ const Link = ({ name, active, setActive }) => {
 
 const Sidebar = ({ active, setActive }) => {
   return (
-    <div className="w-[22rem] overflow-x-hidden relative bg-[#141414] overflow-y-auto h-full">
-      <div className="text-2xl gap-2 py-16 w-full flex items-center justify-center">
+    <div className="w-[22rem] h-screen overflow-x-hidden relative bg-[#141414] overflow-y-auto">
+      <div className="text-2xl gap-2 py-12 w-full flex items-center justify-center">
         <div className="font-extrabold flex items-center gap-1 text-[#44DDA0]">
           AIR
         </div>
         <div>QUALITY</div>
       </div>
       <div className="h-[0.5px] w-full bg-gray-500 bg-opacity-20" />
-      <div className="flex flex-col w-full px-5 py-12 gap-2">
+      <div className="flex flex-col w-full px-3 py-8 gap-2">
         <Link name="Dashboard" active={active} setActive={setActive} />
         <Link name="Location" active={active} setActive={setActive} />
-        <Link name="Pollution Report" active={active} setActive={setActive} />
       </div>
       <div className="h-16" />
       <div className="w-full flex items-center justify-center p-4">

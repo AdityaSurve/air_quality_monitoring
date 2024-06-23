@@ -1,7 +1,6 @@
 import React, { useState } from "react";
 import Dashboard from "./Dashboard";
 import Location from "./Location";
-import PollutionReport from "./PollutionReport";
 import Icons from "./Icons";
 
 const MainModule = ({ data, active, latitude, longitude }) => {
@@ -15,8 +14,6 @@ const MainModule = ({ data, active, latitude, longitude }) => {
         return (
           <Location data={data} latitude={latitude} longitude={longitude} />
         );
-      case "Pollution Report":
-        return <PollutionReport />;
     }
   };
 
