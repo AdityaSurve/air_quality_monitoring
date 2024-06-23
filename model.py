@@ -74,11 +74,7 @@ class AirQualityExtractor:
         print(f'Date: {date}')
         print(f'Hour: {hour}')
         print(f'Bounding Box: {bounding_box}')
-        # url = f'https://www.airnowapi.org/aq/data/?startDate={date}T{hour}&endDate={date}T{hour}&parameters=PM25,PM10&BBOX={bounding_box[0]},{bounding_box[1]},{bounding_box[2]},{bounding_box[3]}&dataType=A&format=application/json&verbose=0&monitorType=0&includerawconcentrations=0&API_KEY=2227FB9E-63AE-497B-A911-03E91430AEA1'
-
-        # start_date is 08/04/2024
-        # end_date is 19/04/2024
-        url = f'https://www.airnowapi.org/aq/data/?startDate=2024-04-08T00&endDate=2024-04-19T23&parameters=PM25,PM10&BBOX={bounding_box[0]},{bounding_box[1]},{bounding_box[2]},{bounding_box[3]}&dataType=A&format=application/json&verbose=0&monitorType=0&includerawconcentrations=0&API_KEY=2227FB9E-63AE-497B-A911-03E91430AEA1'
+        url = f'https://www.airnowapi.org/aq/data/?startDate={date}T{hour}&endDate={date}T{hour}&parameters=PM25,PM10&BBOX={bounding_box[0]},{bounding_box[1]},{bounding_box[2]},{bounding_box[3]}&dataType=A&format=application/json&verbose=0&monitorType=0&includerawconcentrations=0&API_KEY=2227FB9E-63AE-497B-A911-03E91430AEA1'
 
 
         print("Url: ", url)
